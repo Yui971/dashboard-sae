@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="SAÉ 2.02 Mission Control — Pilotage projet Alien<3" />
+  <meta name="theme-color" content="#08080b" />
+  <title>Alien&lt;3 · Mission Control — SAÉ 2.02</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Favicon (inline SVG alien head) -->
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c4f042'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-family='serif' font-size='20' font-style='italic' fill='%23000'%3E%CE%B1%3C/text%3E%3C/svg%3E"
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Atmosphere layer (stars + gradients) -->
+  <div class="atmosphere" aria-hidden="true">
+    <div class="glow glow-top"></div>
+    <div class="glow glow-bottom"></div>
+    <div class="stars" id="stars"></div>
+  </div>
+
+  <!-- Noise overlay -->
+  <div class="noise" aria-hidden="true"></div>
+
+  <main class="container">
+
+    <!-- TOP NAV -->
+    <header class="top-nav stagger-in">
+      <div class="brand">
+        <div class="brand-logo">
+          <span>α</span>
+          <span class="brand-ping"></span>
+        </div>
+        <div class="brand-text">
+          <span class="overline">SAÉ 2.02 · MMI</span>
+          <span class="brand-title">Alien&lt;3 — Mission Control</span>
+        </div>
+      </div>
+      <div class="sync-badge">
+        <span class="sync-dot"></span>
+        <span class="mono" id="sync-label">Synced</span>
+      </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero stagger-in" style="animation-delay: 0.1s">
+      <div class="label-row">
+        <span class="label-accent">◦ Chef de projet</span>
+      </div>
+      <h1 class="display display-lg">
+        Piloter <em class="accent">l'invasion</em><br />
+        <span class="muted">kawaii de la</span><br />
+        <span>pop culture.</span>
+      </h1>
+      <p class="hero-sub">
+        Ligne de collectibles (peluches · keychains · blind boxes) autour d'un
+        petit alien déclinable. Guadeloupe → International. De A à Z, rôle par
+        rôle, tâche par tâche.
+      </p>
+
+      <!-- Hero stats bar -->
+      <div class="hero-stats card-glow">
+        <div class="ring-wrap">
+          <svg class="progress-ring" width="72" height="72" viewBox="0 0 72 72">
+            <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="4" />
+            <circle
+              id="progress-ring-fill"
+              cx="36" cy="36" r="30"
+              fill="none" stroke="#c4f042" stroke-width="4" stroke-linecap="round"
+              stroke-dasharray="188.49" stroke-dashoffset="188.49"
+              style="filter: drop-shadow(0 0 6px rgba(196,240,66,0.5))"
+            />
+          </svg>
+          <div class="ring-text">
+            <span class="mono ring-pct"><span id="progress-pct">0</span><span class="ring-unit">%</span></span>
+          </div>
+        </div>
+
+        <div class="progress-info">
+          <div class="progress-numbers">
+            <span class="mono num-done" id="tasks-done">0</span>
+            <span class="num-total">/ <span id="tasks-total">0</span> tâches</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill grad-shift" id="progress-fill" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div class="divider-v"></div>
+
+        <div class="deadline-block">
+          <span class="overline">Deadline</span>
+          <button id="deadline-btn" class="deadline-btn btn-lift">
+            <span id="deadline-text">—</span>
+            <span class="mono deadline-countdown">J-<span id="deadline-days">0</span></span>
+          </button>
+          <input type="date" id="deadline-input" class="deadline-input edit-inline mono" hidden />
+        </div>
+      </div>
+    </section>
+
+    <!-- STATS GRID -->
+    <section class="stats-grid stagger-in" style="animation-delay: 0.2s">
+      <div class="stat-card card-glow btn-lift">
+        <div class="stat-head">
+          <span class="overline">Compétences</span>
+          <i data-lucide="layers"></i>
+        </div>
+        <div class="stat-value"><span class="display">4</span><span class="muted">/5 mobilisées</span></div>
+      </div>
+      <div class="stat-card card-glow btn-lift">
+        <div class="stat-head">
+          <span class="overline">Volume horaire</span>
+          <i data-lucide="clock"></i>
+        </div>
+        <div class="stat-value"><span class="display">32h</span><span class="muted">avec enseignants</span></div>
+      </div>
+      <div class="stat-card card-glow btn-lift">
+        <div class="stat-head">
+          <span class="overline">Livrables</span>
+          <i data-lucide="package"></i>
+        </div>
+        <div class="stat-value"><span class="display">6</span><span class="muted">à produire</span></div>
+      </div>
+      <div class="stat-card card-glow btn-lift">
+        <div class="stat-head">
+          <span class="overline">Équipe</span>
+          <i data-lucide="users"></i>
+        </div>
+        <div class="stat-value"><span class="display" id="team-count">4</span><span class="muted">membres</span></div>
+      </div>
+    </section>
+
+    <!-- TEAM -->
+    <section class="section stagger-in" style="animation-delay: 0.3s">
+      <div class="section-header">
+        <div>
+          <span class="label-accent muted-accent">◦ Équipe</span>
+          <h2 class="display display-md">Les quatre pilotes.</h2>
+        </div>
+        <span class="mono section-hint">tap pour éditer</span>
+      </div>
+      <div class="team-grid" id="team-grid"></div>
+    </section>
+
+    <!-- PHASES -->
+    <section class="section stagger-in" style="animation-delay: 0.4s">
+      <div class="section-header">
+        <div>
+          <span class="label-accent muted-accent">◦ Roadmap</span>
+          <h2 class="display display-md">Cinq phases, <em class="muted">zéro excuse.</em></h2>
+        </div>
+      </div>
+      <div class="phases" id="phases"></div>
+    </section>
+
+    <!-- LIVRABLES -->
+    <section class="section stagger-in" style="animation-delay: 0.5s">
+      <div class="section-header">
+        <div>
+          <span class="label-accent muted-accent">◦ Livrables</span>
+          <h2 class="display display-md">Six rendus. <em class="muted">Rien de moins.</em></h2>
+        </div>
+      </div>
+      <div class="livrables-grid" id="livrables-grid"></div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer stagger-in" style="animation-delay: 0.6s">
+      <div class="footer-content">
+        <div class="footer-verse">
+          <i data-lucide="sparkles"></i>
+          <span class="mono">Garde ton cœur plus que toute autre chose — Prov. 4:23</span>
+        </div>
+        <div class="footer-actions">
+          <button id="reset-btn" class="mono reset-btn btn-lift">Reset tâches</button>
+          <span class="mono footer-sig">IUT Guadeloupe · MMI 2025–2026</span>
+        </div>
+      </div>
+    </footer>
+
+  </main>
+
+  <!-- Icons (Lucide) -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
