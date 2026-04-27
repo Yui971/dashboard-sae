@@ -128,13 +128,35 @@ const DEFAULT_TEAM = [
 
 const DEFAULT_DEADLINE = '2026-06-15';
 
-// ------- Storage -------
-const STORAGE_KEYS = {
-  tasks: 'sae-tasks-v1',
-  team: 'sae-team-v1',
-  deadline: 'sae-deadline-v1',
-  expanded: 'sae-expanded-v1'
+// ------- Firebase Config -------
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyARPMqUNLiZSE_t695eGY7N-vngaeMJlfY",
+  authDomain: "sae-alien3-dashboard.firebaseapp.com",
+  projectId: "sae-alien3-dashboard",
+  storageBucket: "sae-alien3-dashboard.firebasestorage.app",
+  messagingSenderId: "990099710663",
+  appId: "1:990099710663:web:aa166f5afd67e8e17654e2"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// ------- Storage (Firebase + localStorage cache) -------
+const STORAGE_KEYS = {
+  tasks:    'sae-tasks-v1',
+  team:     'sae-team-v1',
+  deadline: 'sae-deadline-v1',
+  expanded: 'sae-expanded-v1'       // expanded reste local (préférence perso)
+};
+
+// Clés synchronisées avec Firebase (pas "expanded" = préférence locale)
+const SYNCED_KEYS = ['tasks', 'team', 'deadline'];
 
 function load(key, fallback) {
   try {
@@ -145,10 +167,49 @@ function load(key, fallback) {
     return fallback;
   }
 }
+
 function save(key, value) {
+  // Toujours sauvegarder en local (cache rapide)
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {}
+
+  // Si c'est une clé synchronisée → envoyer à Firebase
+  const shortKey = Object.entries(STORAGE_KEYS).find(([, v]) => v === key)?.[0];
+  if (shortKey && SYNCED_KEYS.includes(shortKey)) {
+    db.ref('dashboard/' + shortKey).set(value);
+  }
+}
+
+// ------- Écoute en temps réel (Firebase → UI) -------
+let _firebaseReady = false;
+
+function listenFirebase() {
+  SYNCED_KEYS.forEach(shortKey => {
+    db.ref('dashboard/' + shortKey).on('value', (snapshot) => {
+      const val = snapshot.val();
+      if (val === null) return; // pas encore de données côté serveur
+
+      // Mettre à jour le state + localStorage
+      const lsKey = STORAGE_KEYS[shortKey];
+      try { localStorage.setItem(lsKey, JSON.stringify(val)); } catch {}
+
+      if (shortKey === 'tasks')    state.checked  = val;
+      if (shortKey === 'team')     state.team     = val;
+      if (shortKey === 'deadline') state.deadline = val;
+
+      // Re-render si l'app est déjà initialisée
+      if (_firebaseReady) {
+        renderHero();
+        renderTeam();
+        renderPhases();
+        renderLivrables();
+        if (window.lucide) lucide.createIcons();
+      }
+    });
+  });
+
+  _firebaseReady = true;
 }
 
 // ------- State -------
@@ -547,6 +608,9 @@ function init() {
   renderLivrables();
   setupDeadline();
   setupReset();
+
+  // Lancer l'écoute temps réel Firebase
+  listenFirebase();
 
   if (window.lucide) lucide.createIcons();
 }
