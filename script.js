@@ -130,20 +130,20 @@ const DEFAULT_DEADLINE = '2026-06-15';
 
 /* =========================================================
    FIREBASE — mode compat (objet global `firebase`)
-   Chargé via <script> dans index.html, PAS de `import`
+   URL corrigée : firebaseio.com (zone US)
    ========================================================= */
-const firebaseConfig = {
+var firebaseConfig = {
   apiKey:            "AIzaSyARPMqUNLiZSE_t695eGY7N-vngaeMJlfY",
   authDomain:        "sae-alien3-dashboard.firebaseapp.com",
-  databaseURL:       "https://sae-alien3-dashboard-default-rtdb.europe-west1.firebasedatabase.app",
+  databaseURL:       "https://sae-alien3-dashboard-default-rtdb.firebaseio.com",
   projectId:         "sae-alien3-dashboard",
   storageBucket:     "sae-alien3-dashboard.firebasestorage.app",
   messagingSenderId: "990099710663",
   appId:             "1:990099710663:web:aa166f5afd67e8e17654e2"
 };
 
-let db = null;
-let useFirebase = false;
+var db = null;
+var useFirebase = false;
 
 try {
   if (typeof firebase !== 'undefined') {
@@ -159,21 +159,21 @@ try {
 }
 
 // ------- Storage (Firebase + localStorage cache) -------
-const STORAGE_KEYS = {
+var STORAGE_KEYS = {
   tasks:    'sae-tasks-v1',
   team:     'sae-team-v1',
   deadline: 'sae-deadline-v1',
   expanded: 'sae-expanded-v1'
 };
 
-const SYNCED_KEYS = ['tasks', 'team', 'deadline'];
+var SYNCED_KEYS = ['tasks', 'team', 'deadline'];
 
 function load(key, fallback) {
   try {
-    const raw = localStorage.getItem(key);
+    var raw = localStorage.getItem(key);
     if (raw === null) return fallback;
     return JSON.parse(raw);
-  } catch {
+  } catch (e) {
     return fallback;
   }
 }
@@ -181,28 +181,31 @@ function load(key, fallback) {
 function save(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
+  } catch (e) {}
 
   if (!useFirebase) return;
-  const shortKey = Object.entries(STORAGE_KEYS).find(([, v]) => v === key)?.[0];
-  if (shortKey && SYNCED_KEYS.includes(shortKey)) {
+  var shortKey = null;
+  for (var k in STORAGE_KEYS) {
+    if (STORAGE_KEYS[k] === key) { shortKey = k; break; }
+  }
+  if (shortKey && SYNCED_KEYS.indexOf(shortKey) !== -1) {
     db.ref('dashboard/' + shortKey).set(value);
   }
 }
 
 // ------- Écoute temps réel (Firebase → UI) -------
-let _firebaseReady = false;
+var _firebaseReady = false;
 
 function listenFirebase() {
   if (!useFirebase) return;
 
-  SYNCED_KEYS.forEach(shortKey => {
-    db.ref('dashboard/' + shortKey).on('value', (snapshot) => {
-      const val = snapshot.val();
+  SYNCED_KEYS.forEach(function(shortKey) {
+    db.ref('dashboard/' + shortKey).on('value', function(snapshot) {
+      var val = snapshot.val();
       if (val === null) return;
 
-      const lsKey = STORAGE_KEYS[shortKey];
-      try { localStorage.setItem(lsKey, JSON.stringify(val)); } catch {}
+      var lsKey = STORAGE_KEYS[shortKey];
+      try { localStorage.setItem(lsKey, JSON.stringify(val)); } catch (e) {}
 
       if (shortKey === 'tasks')    state.checked  = val;
       if (shortKey === 'team')     state.team     = val;
@@ -222,7 +225,7 @@ function listenFirebase() {
 }
 
 // ------- State -------
-const state = {
+var state = {
   checked: load(STORAGE_KEYS.tasks, {}),
   team: load(STORAGE_KEYS.team, DEFAULT_TEAM),
   deadline: load(STORAGE_KEYS.deadline, DEFAULT_DEADLINE),
@@ -231,34 +234,37 @@ const state = {
 };
 
 // ------- Helpers -------
-const $  = (sel) => document.querySelector(sel);
-const $$ = (sel) => document.querySelectorAll(sel);
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return document.querySelectorAll(sel); }
 
 function fmtDate(d) {
   try {
     return new Date(d).toLocaleDateString('fr-FR', {
       day: 'numeric', month: 'long', year: 'numeric'
     });
-  } catch {
+  } catch (e) {
     return d;
   }
 }
 
 function daysUntil(d) {
-  const diff = new Date(d) - new Date();
+  var diff = new Date(d) - new Date();
   return Math.max(0, Math.ceil(diff / 86400000));
 }
 
 function computeStats() {
-  const allKeys = PHASES.flatMap(p => p.tasks.map((_, i) => `${p.id}-${i}`));
-  const done = allKeys.filter(k => state.checked[k]).length;
-  const total = allKeys.length;
-  const pct = total ? Math.round((done / total) * 100) : 0;
+  var allKeys = [];
+  PHASES.forEach(function(p) {
+    p.tasks.forEach(function(_, i) { allKeys.push(p.id + '-' + i); });
+  });
+  var done = allKeys.filter(function(k) { return state.checked[k]; }).length;
+  var total = allKeys.length;
+  var pct = total ? Math.round((done / total) * 100) : 0;
 
-  const perPhase = {};
-  PHASES.forEach(p => {
-    const keys = p.tasks.map((_, i) => `${p.id}-${i}`);
-    const d = keys.filter(k => state.checked[k]).length;
+  var perPhase = {};
+  PHASES.forEach(function(p) {
+    var keys = p.tasks.map(function(_, i) { return p.id + '-' + i; });
+    var d = keys.filter(function(k) { return state.checked[k]; }).length;
     perPhase[p.id] = {
       done: d,
       total: keys.length,
@@ -266,24 +272,24 @@ function computeStats() {
     };
   });
 
-  return { done, total, pct, perPhase };
+  return { done: done, total: total, pct: pct, perPhase: perPhase };
 }
 
 // ------- Stars (atmosphere) -------
 function renderStars() {
-  const container = $('#stars');
-  const count = 30;
-  const frag = document.createDocumentFragment();
-  for (let i = 0; i < count; i++) {
-    const size = Math.random() * 2 + 1;
-    const s = document.createElement('div');
+  var container = $('#stars');
+  var count = 30;
+  var frag = document.createDocumentFragment();
+  for (var i = 0; i < count; i++) {
+    var size = Math.random() * 2 + 1;
+    var s = document.createElement('div');
     s.className = 'star';
-    s.style.width = `${size}px`;
-    s.style.height = `${size}px`;
-    s.style.top = `${Math.random() * 100}%`;
-    s.style.left = `${Math.random() * 100}%`;
-    s.style.animationDelay = `${Math.random() * 3}s`;
-    s.style.animationDuration = `${2 + Math.random() * 3}s`;
+    s.style.width = size + 'px';
+    s.style.height = size + 'px';
+    s.style.top = (Math.random() * 100) + '%';
+    s.style.left = (Math.random() * 100) + '%';
+    s.style.animationDelay = (Math.random() * 3) + 's';
+    s.style.animationDuration = (2 + Math.random() * 3) + 's';
     frag.appendChild(s);
   }
   container.appendChild(frag);
@@ -291,77 +297,72 @@ function renderStars() {
 
 // ------- SVG check icon (for checkbox) -------
 function checkSVG() {
-  return `
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path class="check-path"
-        d="M5 12l4 4L19 6"
-        fill="none" stroke="#000" stroke-width="3"
-        stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>`;
+  return '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+    '<path class="check-path" d="M5 12l4 4L19 6" fill="none" stroke="#000" stroke-width="3" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }
 
 // ------- Rendering -------
 function renderHero() {
-  const stats = computeStats();
+  var stats = computeStats();
 
-  const circumference = 2 * Math.PI * 30;
-  const offset = circumference * (1 - stats.pct / 100);
-  const ringFill = $('#progress-ring-fill');
+  var circumference = 2 * Math.PI * 30;
+  var offset = circumference * (1 - stats.pct / 100);
+  var ringFill = $('#progress-ring-fill');
   ringFill.setAttribute('stroke-dasharray', circumference.toFixed(2));
   ringFill.setAttribute('stroke-dashoffset', offset.toFixed(2));
 
   $('#progress-pct').textContent  = stats.pct;
   $('#tasks-done').textContent    = stats.done;
   $('#tasks-total').textContent   = stats.total;
-  $('#progress-fill').style.width = `${stats.pct}%`;
+  $('#progress-fill').style.width = stats.pct + '%';
 
   $('#deadline-text').textContent = fmtDate(state.deadline);
   $('#deadline-days').textContent = daysUntil(state.deadline);
 }
 
 function renderTeam() {
-  const grid = $('#team-grid');
+  var grid = $('#team-grid');
   grid.innerHTML = '';
   $('#team-count').textContent = state.team.length;
 
-  state.team.forEach((m, idx) => {
-    const card = document.createElement('div');
+  state.team.forEach(function(m, idx) {
+    var card = document.createElement('div');
     card.className = 'team-card card-glow btn-lift';
     card.dataset.id = m.id;
 
     if (state.editingMember === m.id) {
-      card.innerHTML = `
-        <div class="team-card-head">
-          <div class="team-avatar ${idx === 0 ? 'lead' : ''}">${m.initial}</div>
-          ${idx === 0 ? '<div class="lead-badge"><span>Lead</span></div>' : ''}
-        </div>
-        <div class="team-edit">
-          <input class="name" type="text" value="${escapeHtml(m.name)}" data-field="name" />
-          <input class="role" type="text" value="${escapeHtml(m.role)}" data-field="role" />
-          <button class="team-edit-save">Valider ↵</button>
-        </div>
-      `;
+      card.innerHTML =
+        '<div class="team-card-head">' +
+          '<div class="team-avatar ' + (idx === 0 ? 'lead' : '') + '">' + m.initial + '</div>' +
+          (idx === 0 ? '<div class="lead-badge"><span>Lead</span></div>' : '') +
+        '</div>' +
+        '<div class="team-edit">' +
+          '<input class="name" type="text" value="' + escapeHtml(m.name) + '" data-field="name" />' +
+          '<input class="role" type="text" value="' + escapeHtml(m.role) + '" data-field="role" />' +
+          '<button class="team-edit-save">Valider ↵</button>' +
+        '</div>';
 
-      card.addEventListener('click', (e) => e.stopPropagation());
+      card.addEventListener('click', function(e) { e.stopPropagation(); });
 
-      const nameInput = card.querySelector('input[data-field="name"]');
-      const roleInput = card.querySelector('input[data-field="role"]');
-      const saveBtn   = card.querySelector('.team-edit-save');
+      var nameInput = card.querySelector('input[data-field="name"]');
+      var roleInput = card.querySelector('input[data-field="role"]');
+      var saveBtn   = card.querySelector('.team-edit-save');
 
       nameInput.focus();
       nameInput.setSelectionRange(nameInput.value.length, nameInput.value.length);
 
-      const commit = () => {
-        const name = nameInput.value.trim() || m.name;
-        const role = roleInput.value.trim() || m.role;
-        updateMember(m.id, { name, role, initial: name.charAt(0).toUpperCase() });
+      var commit = function() {
+        var name = nameInput.value.trim() || m.name;
+        var role = roleInput.value.trim() || m.role;
+        updateMember(m.id, { name: name, role: role, initial: name.charAt(0).toUpperCase() });
         state.editingMember = null;
         renderTeam();
       };
 
       saveBtn.addEventListener('click', commit);
-      [nameInput, roleInput].forEach(inp => {
-        inp.addEventListener('keydown', (e) => {
+      [nameInput, roleInput].forEach(function(inp) {
+        inp.addEventListener('keydown', function(e) {
           if (e.key === 'Enter') commit();
           if (e.key === 'Escape') {
             state.editingMember = null;
@@ -370,16 +371,15 @@ function renderTeam() {
         });
       });
     } else {
-      card.innerHTML = `
-        <div class="team-card-head">
-          <div class="team-avatar ${idx === 0 ? 'lead' : ''}">${escapeHtml(m.initial)}</div>
-          ${idx === 0 ? '<div class="lead-badge"><span>Lead</span></div>' : ''}
-        </div>
-        <div class="team-name">${escapeHtml(m.name)}</div>
-        <div class="team-role">${escapeHtml(m.role)}</div>
-        <i class="edit-icon" data-lucide="edit-2"></i>
-      `;
-      card.addEventListener('click', () => {
+      card.innerHTML =
+        '<div class="team-card-head">' +
+          '<div class="team-avatar ' + (idx === 0 ? 'lead' : '') + '">' + escapeHtml(m.initial) + '</div>' +
+          (idx === 0 ? '<div class="lead-badge"><span>Lead</span></div>' : '') +
+        '</div>' +
+        '<div class="team-name">' + escapeHtml(m.name) + '</div>' +
+        '<div class="team-role">' + escapeHtml(m.role) + '</div>' +
+        '<i class="edit-icon" data-lucide="edit-2"></i>';
+      card.addEventListener('click', function() {
         state.editingMember = m.id;
         renderTeam();
       });
@@ -392,80 +392,77 @@ function renderTeam() {
 }
 
 function renderPhases() {
-  const container = $('#phases');
+  var container = $('#phases');
   container.innerHTML = '';
-  const stats = computeStats();
+  var stats = computeStats();
 
-  PHASES.forEach((phase) => {
-    const ps = stats.perPhase[phase.id];
-    const isOpen = state.expanded === phase.id;
-    const allDone = ps.pct === 100;
+  PHASES.forEach(function(phase) {
+    var ps = stats.perPhase[phase.id];
+    var isOpen = state.expanded === phase.id;
+    var allDone = ps.pct === 100;
 
-    const el = document.createElement('div');
-    el.className = `phase card-glow ${isOpen ? 'open' : ''}`;
+    var el = document.createElement('div');
+    el.className = 'phase card-glow ' + (isOpen ? 'open' : '');
     el.dataset.id = phase.id;
 
-    el.innerHTML = `
-      <button class="phase-head" aria-expanded="${isOpen}">
-        <span class="phase-num">${phase.num}</span>
-        <div class="phase-icon ${allDone ? 'done' : ''}">
-          <i data-lucide="${allDone ? 'check' : phase.icon}"></i>
-        </div>
-        <div class="phase-info">
-          <div class="phase-title-row">
-            <h3 class="phase-title">${escapeHtml(phase.title)}</h3>
-            <span class="phase-duration">${escapeHtml(phase.duration)}</span>
-          </div>
-          <p class="phase-subtitle">${escapeHtml(phase.subtitle)}</p>
-        </div>
-        <div class="phase-stat">
-          <span class="phase-stat-count">${ps.done}/${ps.total}</span>
-          <div class="phase-stat-bar">
-            <div class="phase-stat-fill" style="width: ${ps.pct}%"></div>
-          </div>
-        </div>
-        <i class="chevron" data-lucide="chevron-down"></i>
-      </button>
+    var tasksHtml = '';
+    phase.tasks.forEach(function(task, tIdx) {
+      var key = phase.id + '-' + tIdx;
+      var done = !!state.checked[key];
+      tasksHtml += '<li>' +
+        '<button class="task ' + (done ? 'done' : '') + '" data-key="' + key + '">' +
+          '<span class="task-checkbox ' + (done ? 'done' : '') + '">' +
+            (done ? checkSVG() : '') +
+          '</span>' +
+          '<span class="task-label">' + escapeHtml(task) + '</span>' +
+          '<span class="task-index">·' + String(tIdx + 1).padStart(2, '0') + '</span>' +
+        '</button>' +
+      '</li>';
+    });
 
-      <div class="phase-body">
-        <div class="phase-body-inner">
-          <div class="task-list-wrap">
-            <ul class="task-list">
-              ${phase.tasks.map((task, tIdx) => {
-                const key = `${phase.id}-${tIdx}`;
-                const done = !!state.checked[key];
-                return `
-                  <li>
-                    <button class="task ${done ? 'done' : ''}" data-key="${key}">
-                      <span class="task-checkbox ${done ? 'done' : ''}">
-                        ${done ? checkSVG() : ''}
-                      </span>
-                      <span class="task-label">${escapeHtml(task)}</span>
-                      <span class="task-index">·${String(tIdx + 1).padStart(2, '0')}</span>
-                    </button>
-                  </li>
-                `;
-              }).join('')}
-            </ul>
-          </div>
-        </div>
-      </div>
-    `;
+    el.innerHTML =
+      '<button class="phase-head" aria-expanded="' + isOpen + '">' +
+        '<span class="phase-num">' + phase.num + '</span>' +
+        '<div class="phase-icon ' + (allDone ? 'done' : '') + '">' +
+          '<i data-lucide="' + (allDone ? 'check' : phase.icon) + '"></i>' +
+        '</div>' +
+        '<div class="phase-info">' +
+          '<div class="phase-title-row">' +
+            '<h3 class="phase-title">' + escapeHtml(phase.title) + '</h3>' +
+            '<span class="phase-duration">' + escapeHtml(phase.duration) + '</span>' +
+          '</div>' +
+          '<p class="phase-subtitle">' + escapeHtml(phase.subtitle) + '</p>' +
+        '</div>' +
+        '<div class="phase-stat">' +
+          '<span class="phase-stat-count">' + ps.done + '/' + ps.total + '</span>' +
+          '<div class="phase-stat-bar">' +
+            '<div class="phase-stat-fill" style="width: ' + ps.pct + '%"></div>' +
+          '</div>' +
+        '</div>' +
+        '<i class="chevron" data-lucide="chevron-down"></i>' +
+      '</button>' +
+      '<div class="phase-body">' +
+        '<div class="phase-body-inner">' +
+          '<div class="task-list-wrap">' +
+            '<ul class="task-list">' + tasksHtml + '</ul>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
 
-    el.querySelector('.phase-head').addEventListener('click', () => {
+    el.querySelector('.phase-head').addEventListener('click', function() {
       state.expanded = isOpen ? null : phase.id;
       save(STORAGE_KEYS.expanded, state.expanded);
       renderPhases();
     });
 
-    el.querySelectorAll('.task').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const key = btn.dataset.key;
+    el.querySelectorAll('.task').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var key = btn.dataset.key;
         state.checked[key] = !state.checked[key];
         save(STORAGE_KEYS.tasks, state.checked);
-        const done = !!state.checked[key];
+        var done = !!state.checked[key];
         btn.classList.toggle('done', done);
-        const cb = btn.querySelector('.task-checkbox');
+        var cb = btn.querySelector('.task-checkbox');
         cb.classList.toggle('done', done);
         cb.innerHTML = done ? checkSVG() : '';
         updateAggregates();
@@ -479,27 +476,26 @@ function renderPhases() {
 }
 
 function renderLivrables() {
-  const grid = $('#livrables-grid');
+  var grid = $('#livrables-grid');
   grid.innerHTML = '';
-  const stats = computeStats();
+  var stats = computeStats();
 
-  LIVRABLES.forEach((l, idx) => {
-    const phase = PHASES.find(p => p.id === l.phase);
-    const ps = stats.perPhase[l.phase];
+  LIVRABLES.forEach(function(l, idx) {
+    var phase = PHASES.find(function(p) { return p.id === l.phase; });
+    var ps = stats.perPhase[l.phase];
 
-    const el = document.createElement('div');
+    var el = document.createElement('div');
     el.className = 'livrable card-glow btn-lift';
-    el.innerHTML = `
-      <span class="livrable-num">0${idx + 1}</span>
-      <div class="livrable-body">
-        <div class="livrable-name">${escapeHtml(l.name)}</div>
-        <div class="livrable-meta">
-          <span class="livrable-phase">${escapeHtml(phase?.title || '')}</span>
-          <span class="livrable-pct">${ps.pct}%</span>
-        </div>
-      </div>
-      <i class="livrable-arrow" data-lucide="arrow-up-right"></i>
-    `;
+    el.innerHTML =
+      '<span class="livrable-num">0' + (idx + 1) + '</span>' +
+      '<div class="livrable-body">' +
+        '<div class="livrable-name">' + escapeHtml(l.name) + '</div>' +
+        '<div class="livrable-meta">' +
+          '<span class="livrable-phase">' + escapeHtml(phase ? phase.title : '') + '</span>' +
+          '<span class="livrable-pct">' + ps.pct + '%</span>' +
+        '</div>' +
+      '</div>' +
+      '<i class="livrable-arrow" data-lucide="arrow-up-right"></i>';
     grid.appendChild(el);
   });
 
@@ -508,55 +504,60 @@ function renderLivrables() {
 
 function updateAggregates() {
   renderHero();
-  const stats = computeStats();
-  PHASES.forEach(p => {
-    const ps = stats.perPhase[p.id];
-    const el = $(`.phase[data-id="${p.id}"]`);
+  var stats = computeStats();
+  PHASES.forEach(function(p) {
+    var ps = stats.perPhase[p.id];
+    var el = $('.phase[data-id="' + p.id + '"]');
     if (!el) return;
 
-    const countEl = el.querySelector('.phase-stat-count');
-    const fillEl  = el.querySelector('.phase-stat-fill');
-    const iconEl  = el.querySelector('.phase-icon');
-    if (countEl) countEl.textContent = `${ps.done}/${ps.total}`;
-    if (fillEl)  fillEl.style.width = `${ps.pct}%`;
+    var countEl = el.querySelector('.phase-stat-count');
+    var fillEl  = el.querySelector('.phase-stat-fill');
+    var iconEl  = el.querySelector('.phase-icon');
+    if (countEl) countEl.textContent = ps.done + '/' + ps.total;
+    if (fillEl)  fillEl.style.width = ps.pct + '%';
 
-    const wasAllDone = iconEl.classList.contains('done');
-    const allDone = ps.pct === 100;
+    var wasAllDone = iconEl.classList.contains('done');
+    var allDone = ps.pct === 100;
     if (wasAllDone !== allDone) {
       iconEl.classList.toggle('done', allDone);
-      const iName = allDone ? 'check' : p.icon;
-      iconEl.innerHTML = `<i data-lucide="${iName}"></i>`;
+      var iName = allDone ? 'check' : p.icon;
+      iconEl.innerHTML = '<i data-lucide="' + iName + '"></i>';
       if (window.lucide) lucide.createIcons();
     }
   });
-  const livrableEls = $$('.livrable .livrable-pct');
-  LIVRABLES.forEach((l, i) => {
-    const ps = stats.perPhase[l.phase];
-    if (livrableEls[i]) livrableEls[i].textContent = `${ps.pct}%`;
+  var livrableEls = $$('.livrable .livrable-pct');
+  LIVRABLES.forEach(function(l, i) {
+    var ps = stats.perPhase[l.phase];
+    if (livrableEls[i]) livrableEls[i].textContent = ps.pct + '%';
   });
 }
 
 function updateMember(id, patch) {
-  state.team = state.team.map(m => (m.id === id ? { ...m, ...patch } : m));
+  state.team = state.team.map(function(m) {
+    if (m.id === id) {
+      return Object.assign({}, m, patch);
+    }
+    return m;
+  });
   save(STORAGE_KEYS.team, state.team);
 }
 
 // ------- Deadline editing -------
 function setupDeadline() {
-  const btn   = $('#deadline-btn');
-  const input = $('#deadline-input');
+  var btn   = $('#deadline-btn');
+  var input = $('#deadline-input');
 
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', function() {
     input.value = state.deadline;
     btn.hidden = true;
     input.hidden = false;
     input.focus();
     if (input.showPicker) {
-      try { input.showPicker(); } catch {}
+      try { input.showPicker(); } catch (e) {}
     }
   });
 
-  const commit = () => {
+  var commit = function() {
     if (input.value) {
       state.deadline = input.value;
       save(STORAGE_KEYS.deadline, state.deadline);
@@ -568,14 +569,14 @@ function setupDeadline() {
 
   input.addEventListener('change', commit);
   input.addEventListener('blur', commit);
-  input.addEventListener('keydown', (e) => {
+  input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' || e.key === 'Escape') commit();
   });
 }
 
 // ------- Reset -------
 function setupReset() {
-  $('#reset-btn').addEventListener('click', () => {
+  $('#reset-btn').addEventListener('click', function() {
     if (!confirm('Réinitialiser toutes les tâches cochées ?')) return;
     state.checked = {};
     save(STORAGE_KEYS.tasks, state.checked);
