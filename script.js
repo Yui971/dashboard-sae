@@ -1,6 +1,6 @@
 /* =========================================================
    SAÉ 2.02 · Mission Control — Alien<3
-   Vanilla JS — localStorage-based persistence
+   Vanilla JS — Firebase Realtime DB + localStorage cache
    ========================================================= */
 
 // ------- Data -------
@@ -128,34 +128,44 @@ const DEFAULT_TEAM = [
 
 const DEFAULT_DEADLINE = '2026-06-15';
 
-// ------- Firebase Config -------
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
+/* =========================================================
+   FIREBASE — mode compat (objet global `firebase`)
+   Chargé via <script> dans index.html, PAS de `import`
+   ========================================================= */
 const firebaseConfig = {
-  apiKey: "AIzaSyARPMqUNLiZSE_t695eGY7N-vngaeMJlfY",
-  authDomain: "sae-alien3-dashboard.firebaseapp.com",
-  projectId: "sae-alien3-dashboard",
-  storageBucket: "sae-alien3-dashboard.firebasestorage.app",
+  apiKey:            "AIzaSyARPMqUNLiZSE_t695eGY7N-vngaeMJlfY",
+  authDomain:        "sae-alien3-dashboard.firebaseapp.com",
+  databaseURL:       "https://sae-alien3-dashboard-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "sae-alien3-dashboard",
+  storageBucket:     "sae-alien3-dashboard.firebasestorage.app",
   messagingSenderId: "990099710663",
-  appId: "1:990099710663:web:aa166f5afd67e8e17654e2"
+  appId:             "1:990099710663:web:aa166f5afd67e8e17654e2"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let db = null;
+let useFirebase = false;
+
+try {
+  if (typeof firebase !== 'undefined') {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    useFirebase = true;
+    console.log('🟢 Firebase connecté — synchro temps réel activée');
+  } else {
+    console.warn('⚠️ SDK Firebase non chargé — mode localStorage seul');
+  }
+} catch (err) {
+  console.warn('⚠️ Firebase init échoué, fallback localStorage :', err);
+}
 
 // ------- Storage (Firebase + localStorage cache) -------
 const STORAGE_KEYS = {
   tasks:    'sae-tasks-v1',
   team:     'sae-team-v1',
   deadline: 'sae-deadline-v1',
-  expanded: 'sae-expanded-v1'       // expanded reste local (préférence perso)
+  expanded: 'sae-expanded-v1'
 };
 
-// Clés synchronisées avec Firebase (pas "expanded" = préférence locale)
 const SYNCED_KEYS = ['tasks', 'team', 'deadline'];
 
 function load(key, fallback) {
@@ -169,28 +179,28 @@ function load(key, fallback) {
 }
 
 function save(key, value) {
-  // Toujours sauvegarder en local (cache rapide)
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {}
 
-  // Si c'est une clé synchronisée → envoyer à Firebase
+  if (!useFirebase) return;
   const shortKey = Object.entries(STORAGE_KEYS).find(([, v]) => v === key)?.[0];
   if (shortKey && SYNCED_KEYS.includes(shortKey)) {
     db.ref('dashboard/' + shortKey).set(value);
   }
 }
 
-// ------- Écoute en temps réel (Firebase → UI) -------
+// ------- Écoute temps réel (Firebase → UI) -------
 let _firebaseReady = false;
 
 function listenFirebase() {
+  if (!useFirebase) return;
+
   SYNCED_KEYS.forEach(shortKey => {
     db.ref('dashboard/' + shortKey).on('value', (snapshot) => {
       const val = snapshot.val();
-      if (val === null) return; // pas encore de données côté serveur
+      if (val === null) return;
 
-      // Mettre à jour le state + localStorage
       const lsKey = STORAGE_KEYS[shortKey];
       try { localStorage.setItem(lsKey, JSON.stringify(val)); } catch {}
 
@@ -198,7 +208,6 @@ function listenFirebase() {
       if (shortKey === 'team')     state.team     = val;
       if (shortKey === 'deadline') state.deadline = val;
 
-      // Re-render si l'app est déjà initialisée
       if (_firebaseReady) {
         renderHero();
         renderTeam();
@@ -295,8 +304,7 @@ function checkSVG() {
 function renderHero() {
   const stats = computeStats();
 
-  // Progress ring
-  const circumference = 2 * Math.PI * 30; // ≈ 188.49
+  const circumference = 2 * Math.PI * 30;
   const offset = circumference * (1 - stats.pct / 100);
   const ringFill = $('#progress-ring-fill');
   ringFill.setAttribute('stroke-dasharray', circumference.toFixed(2));
@@ -307,7 +315,6 @@ function renderHero() {
   $('#tasks-total').textContent   = stats.total;
   $('#progress-fill').style.width = `${stats.pct}%`;
 
-  // Deadline
   $('#deadline-text').textContent = fmtDate(state.deadline);
   $('#deadline-days').textContent = daysUntil(state.deadline);
 }
@@ -335,7 +342,6 @@ function renderTeam() {
         </div>
       `;
 
-      // Prevent card click from bubbling while editing
       card.addEventListener('click', (e) => e.stopPropagation());
 
       const nameInput = card.querySelector('input[data-field="name"]');
@@ -446,26 +452,22 @@ function renderPhases() {
       </div>
     `;
 
-    // Header toggle
     el.querySelector('.phase-head').addEventListener('click', () => {
       state.expanded = isOpen ? null : phase.id;
       save(STORAGE_KEYS.expanded, state.expanded);
       renderPhases();
     });
 
-    // Task toggles
     el.querySelectorAll('.task').forEach(btn => {
       btn.addEventListener('click', () => {
         const key = btn.dataset.key;
         state.checked[key] = !state.checked[key];
         save(STORAGE_KEYS.tasks, state.checked);
-        // Patch DOM directly for snappy feedback
         const done = !!state.checked[key];
         btn.classList.toggle('done', done);
         const cb = btn.querySelector('.task-checkbox');
         cb.classList.toggle('done', done);
         cb.innerHTML = done ? checkSVG() : '';
-        // Then update aggregates
         updateAggregates();
       });
     });
@@ -504,13 +506,8 @@ function renderLivrables() {
   if (window.lucide) lucide.createIcons();
 }
 
-/**
- * Update only aggregate displays (ring, progress bar, phase stats, livrables),
- * without re-rendering the whole phases (keeps animations smooth on task toggle).
- */
 function updateAggregates() {
   renderHero();
-  // Phase stats
   const stats = computeStats();
   PHASES.forEach(p => {
     const ps = stats.perPhase[p.id];
@@ -532,7 +529,6 @@ function updateAggregates() {
       if (window.lucide) lucide.createIcons();
     }
   });
-  // Livrables percentages
   const livrableEls = $$('.livrable .livrable-pct');
   LIVRABLES.forEach((l, i) => {
     const ps = stats.perPhase[l.phase];
@@ -608,8 +604,6 @@ function init() {
   renderLivrables();
   setupDeadline();
   setupReset();
-
-  // Lancer l'écoute temps réel Firebase
   listenFirebase();
 
   if (window.lucide) lucide.createIcons();
